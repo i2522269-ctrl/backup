@@ -1,0 +1,47 @@
+name: sistema-reportes-intermediaria
+
+on:
+  workflow_dispatch: # Para que tú lo corras cuando quieras probar
+  schedule:
+    - cron: "0 0 * * *"   # Reporte Diario (Medianoche)
+    - cron: "0 0 * * 0"   # Reporte Semanal (Domingos)
+    - cron: "0 0 1 * *"   # Reporte Mensual (Día 1)
+
+jobs:
+  generar_reporte:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Postgres Client 17
+        run: |
+          sudo apt update
+          sudo apt install -y wget gnupg lsb-release
+          sudo mkdir -p /usr/share/keyrings
+          wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt update && sudo apt install -y postgresql-client-17
+
+      - name: Generar Reporte de Transacciones
+        env:
+          PGPASSWORD: tmiLSJC8dLiMrMh8
+        run: |
+          psql -h aws-0-us-west-2.pooler.supabase.com -U auditor_alertas -d postgres -c "
+          SELECT 
+            CASE 
+              WHEN fecha_registro > NOW() - INTERVAL '1 day' THEN 'REPORTE DIARIO'
+              WHEN fecha_registro > NOW() - INTERVAL '7 days' THEN 'REPORTE SEMANAL'
+              ELSE 'REPORTE MENSUAL'
+            END as tipo_periodo,
+            estado_transaccion,
+            COUNT(*) as total_transacciones,
+            SUM(monto_comision) as total_comisiones
+          FROM silver.transacciones_servicios
+          GROUP BY 1, 2;" > balance_servicios.txt
+
+      - name: Guardar Reporte como Artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-empresa-intermediaria
+          path: balance_servicios.txt
