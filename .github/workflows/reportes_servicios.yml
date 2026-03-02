@@ -1,38 +1,67 @@
 name: sistema-reportes-intermediaria
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Ejecución manual para pruebas
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "0 0 * * *"   # Se ejecuta automáticamente a las 12:00 AM cada día
 
 jobs:
   generar_reporte:
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Postgres Client 17
         run: |
+          # 1. Configurar repositorio oficial para evitar el error 'Unable to locate package'
           sudo apt update
           sudo apt install -y wget gnupg lsb-release
           sudo mkdir -p /usr/share/keyrings
           wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
           echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
-          sudo apt update && sudo apt install -y postgresql-client-17
+          sudo apt update
+          sudo apt install -y postgresql-client-17
 
-      - name: Generar Reporte de Transacciones
+      - name: Generar Reporte Consolidado (Consigna Empresa)
         env:
+          # Clave de seguridad del usuario auditor
           PGPASSWORD: tmiLSJC8dLiMrMh8
         run: |
           psql -h aws-0-us-west-2.pooler.supabase.com \
                -p 5432 \
                -U auditor_alertas.dodwsyjqvclcftfvklmr \
                -d postgres \
-               -c "SELECT 'CONEXIÓN EXITOSA' as estado, COUNT(*) as total FROM silver.transacciones_servicios;" > balance_servicios.txt
+               -c "
+          WITH metricas AS (
+              SELECT 
+                  estado_transaccion,
+                  COUNT(*) as cantidad,
+                  SUM(monto_comision) as total_comision,
+                  fecha_registro
+              FROM silver.transacciones_servicios
+              GROUP BY estado_transaccion, fecha_registro
+          )
+          -- Reporte Diario
+          SELECT 'REPORTE DIARIO' as periodo, estado_transaccion, SUM(cantidad) as total, SUM(total_comision) as comisiones 
+          FROM metricas WHERE fecha_registro > NOW() - INTERVAL '1 day' GROUP BY 1, 2
+          UNION ALL
+          -- Reporte Semanal
+          SELECT 'REPORTE SEMANAL', estado_transaccion, SUM(cantidad), SUM(total_comision) 
+          FROM metricas WHERE fecha_registro > NOW() - INTERVAL '7 days' GROUP BY 1, 2
+          UNION ALL
+          -- Reporte Mensual
+          SELECT 'REPORTE MENSUAL', estado_transaccion, SUM(cantidad), SUM(total_comision) 
+          FROM metricas WHERE fecha_registro > NOW() - INTERVAL '1 month' GROUP BY 1, 2
+          UNION ALL
+          -- Reporte Anual
+          SELECT 'REPORTE ANUAL', estado_transaccion, SUM(cantidad), SUM(total_comision) 
+          FROM metricas WHERE fecha_registro > NOW() - INTERVAL '1 year' GROUP BY 1, 2;
+          " > reporte_balance_intermediaria.txt
 
-      - name: Guardar Reporte
+      - name: Subir Reporte Final
         uses: actions/upload-artifact@v4
         with:
-          name: reporte-empresa-intermediaria
-          path: balance_servicios.txt
+          name: reporte-empresa-servicios
+          path: reporte_balance_intermediaria.txt
