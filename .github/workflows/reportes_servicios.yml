@@ -1,8 +1,30 @@
-- name: Generar Reporte de Transacciones
+name: sistema-reportes-intermediaria
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  generar_reporte:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Postgres Client 17
+        run: |
+          sudo apt update
+          sudo apt install -y wget gnupg lsb-release
+          sudo mkdir -p /usr/share/keyrings
+          wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt update && sudo apt install -y postgresql-client-17
+
+      - name: Generar Reporte de Transacciones
         env:
           PGPASSWORD: tmiLSJC8dLiMrMh8
         run: |
-          # Fíjate en el cambio del -U (Usuario)
           psql -h aws-0-us-west-2.pooler.supabase.com \
                -p 5432 \
                -U auditor_alertas.dodwsyjqvclcftfvklmr \
@@ -20,3 +42,8 @@
           FROM silver.transacciones_servicios
           GROUP BY 1, 2;" > balance_servicios.txt
 
+      - name: Guardar Reporte
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-empresa-intermediaria
+          path: balance_servicios.txt
