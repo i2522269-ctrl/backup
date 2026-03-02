@@ -19,3 +19,4 @@
             SUM(monto_comision) as total_comisiones
           FROM silver.transacciones_servicios
           GROUP BY 1, 2;" > balance_servicios.txt
+
