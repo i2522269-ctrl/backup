@@ -1,9 +1,9 @@
 name: supabase-backup-gold
 
 on:
-  workflow_dispatch: # Esto activa el botón manual que buscabas
+  workflow_dispatch:
   schedule:
-    - cron: "0 5 * * *" # 12:00 AM Perú (5:00 UTC)
+    - cron: "0 5 * * *"
 
 jobs:
   backup:
@@ -13,12 +13,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install PostgreSQL client
+      - name: Install PostgreSQL client 17
         run: |
+          # 1. Instalar dependencias para manejar repositorios
+          sudo apt update
+          sudo apt install -y wget gnupg lsb-release
+
+          # 2. Agregar la llave GPG oficial de PostgreSQL para verificar la autenticidad
+          sudo mkdir -p /usr/share/keyrings
+          wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+
+          # 3. Registrar el repositorio oficial de PostgreSQL (PGDG)
+          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+
+          # 4. Actualizar e instalar la versión 17
           sudo apt update
           sudo apt install -y postgresql-client-17
 
-      - name: Run pg_dump
+      - name: Run pg_dump (Gold Schema)
         env:
           PGPASSWORD: tmiLSJC8dLiMrMh8
           PGSSLMODE: require
