@@ -1,0 +1,42 @@
+# backup
+backaup idl3
+
+name: supabase-backup-gold
+
+on:
+  workflow_dispatch: # Esto activa el botón manual
+  schedule:
+    - cron: "0 5 * * *" # 12:00 AM Perú
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt update
+          sudo apt install -y postgresql-client-17
+
+      - name: Run pg_dump
+        env:
+          PGPASSWORD: tmiLSJC8dLiMrMh8
+          PGSSLMODE: require
+        run: |
+          pg_dump \
+            -h aws-0-us-west-2.pooler.supabase.com \
+            -p 5432 \
+            -U postgres.dodwsyjqvclcftfvklmr \
+            -d postgres \
+            -n gold \
+            -F c \
+            -f gold_backup_$(date +%Y%m%d).dump
+
+      - name: Upload backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: gold-backup-file
+          path: "*.dump"
