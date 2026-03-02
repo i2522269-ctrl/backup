@@ -21,9 +21,8 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt update && sudo apt install -y postgresql-client-17
 
-- name: Generar Reporte de Transacciones
+      - name: Generar Reporte de Transacciones
         env:
-          # Asegúrate de que no haya espacios extras aquí
           PGPASSWORD: tmiLSJC8dLiMrMh8
         run: |
           psql -h aws-0-us-west-2.pooler.supabase.com \
