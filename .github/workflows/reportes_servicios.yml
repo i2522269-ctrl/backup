@@ -65,3 +65,13 @@ jobs:
         with:
           name: reporte-empresa-servicios
           path: reporte_balance_intermediaria.txt
+
+- name: Verificar Alerta de Seguridad
+        run: |
+          # Si el archivo del reporte contiene más de 5 fallos en el reporte diario, lanzamos una advertencia
+          FALLOS=$(grep "REPORTE DIARIO" reporte_balance_intermediaria.txt | grep "no_exitosa" | awk '{print $NF}')
+          if [ ! -z "$FALLOS" ] && [ "$FALLOS" -gt 5 ]; then
+            echo "::warning title=Alerta de Seguridad::Se detectó un volumen inusual de transacciones fallidas ($FALLOS). Posible intento de fraude o caída de servicio."
+          else
+            echo "Volumen de transacciones fallidas dentro del rango normal."
+          fi
