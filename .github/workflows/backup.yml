@@ -1,6 +1,3 @@
-# backup
-backaup idl3
-
 name: supabase-backup-gold
 
 on:
