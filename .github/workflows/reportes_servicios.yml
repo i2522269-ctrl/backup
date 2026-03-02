@@ -1,9 +1,9 @@
 name: sistema-reportes-intermediaria
 
 on:
-  workflow_dispatch: # Ejecución manual para pruebas
+  workflow_dispatch:
   schedule:
-    - cron: "0 0 * * *"   # Se ejecuta automáticamente a las 12:00 AM cada día
+    - cron: "0 0 * * *"
 
 jobs:
   generar_reporte:
@@ -15,7 +15,6 @@ jobs:
 
       - name: Install Postgres Client 17
         run: |
-          # 1. Configurar repositorio oficial para evitar el error 'Unable to locate package'
           sudo apt update
           sudo apt install -y wget gnupg lsb-release
           sudo mkdir -p /usr/share/keyrings
@@ -24,9 +23,8 @@ jobs:
           sudo apt update
           sudo apt install -y postgresql-client-17
 
-      - name: Generar Reporte Consolidado (Consigna Empresa)
+      - name: Generar Reporte Consolidado
         env:
-          # Clave de seguridad del usuario auditor
           PGPASSWORD: tmiLSJC8dLiMrMh8
         run: |
           psql -h aws-0-us-west-2.pooler.supabase.com \
@@ -43,35 +41,31 @@ jobs:
               FROM silver.transacciones_servicios
               GROUP BY estado_transaccion, fecha_registro
           )
-          -- Reporte Diario
           SELECT 'REPORTE DIARIO' as periodo, estado_transaccion, SUM(cantidad) as total, SUM(total_comision) as comisiones 
           FROM metricas WHERE fecha_registro > NOW() - INTERVAL '1 day' GROUP BY 1, 2
           UNION ALL
-          -- Reporte Semanal
           SELECT 'REPORTE SEMANAL', estado_transaccion, SUM(cantidad), SUM(total_comision) 
           FROM metricas WHERE fecha_registro > NOW() - INTERVAL '7 days' GROUP BY 1, 2
           UNION ALL
-          -- Reporte Mensual
           SELECT 'REPORTE MENSUAL', estado_transaccion, SUM(cantidad), SUM(total_comision) 
           FROM metricas WHERE fecha_registro > NOW() - INTERVAL '1 month' GROUP BY 1, 2
           UNION ALL
-          -- Reporte Anual
           SELECT 'REPORTE ANUAL', estado_transaccion, SUM(cantidad), SUM(total_comision) 
           FROM metricas WHERE fecha_registro > NOW() - INTERVAL '1 year' GROUP BY 1, 2;
           " > reporte_balance_intermediaria.txt
+
+      - name: Verificar Alerta de Seguridad
+        run: |
+          # Analizamos el reporte generado para buscar fallos inusuales
+          FALLOS=$(grep "REPORTE DIARIO" reporte_balance_intermediaria.txt | grep "no_exitosa" | awk '{print $3}' || echo 0)
+          if [ ! -z "$FALLOS" ] && [ "$FALLOS" -gt 5 ]; then
+            echo "::warning title=Alerta de Seguridad::Se detectó un volumen inusual de transacciones fallidas ($FALLOS)."
+          else
+            echo "Volumen de transacciones fallidas normal."
+          fi
 
       - name: Subir Reporte Final
         uses: actions/upload-artifact@v4
         with:
           name: reporte-empresa-servicios
           path: reporte_balance_intermediaria.txt
-
-- name: Verificar Alerta de Seguridad
-        run: |
-          # Si el archivo del reporte contiene más de 5 fallos en el reporte diario, lanzamos una advertencia
-          FALLOS=$(grep "REPORTE DIARIO" reporte_balance_intermediaria.txt | grep "no_exitosa" | awk '{print $NF}')
-          if [ ! -z "$FALLOS" ] && [ "$FALLOS" -gt 5 ]; then
-            echo "::warning title=Alerta de Seguridad::Se detectó un volumen inusual de transacciones fallidas ($FALLOS). Posible intento de fraude o caída de servicio."
-          else
-            echo "Volumen de transacciones fallidas dentro del rango normal."
-          fi
