@@ -21,26 +21,16 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt update && sudo apt install -y postgresql-client-17
 
-      - name: Generar Reporte de Transacciones
+- name: Generar Reporte de Transacciones
         env:
+          # Asegúrate de que no haya espacios extras aquí
           PGPASSWORD: tmiLSJC8dLiMrMh8
         run: |
           psql -h aws-0-us-west-2.pooler.supabase.com \
                -p 5432 \
                -U auditor_alertas.dodwsyjqvclcftfvklmr \
                -d postgres \
-               -c "
-          SELECT 
-            CASE 
-              WHEN fecha_registro > NOW() - INTERVAL '1 day' THEN 'REPORTE DIARIO'
-              WHEN fecha_registro > NOW() - INTERVAL '7 days' THEN 'REPORTE SEMANAL'
-              ELSE 'REPORTE MENSUAL'
-            END as tipo_periodo,
-            estado_transaccion,
-            COUNT(*) as total_transacciones,
-            SUM(monto_comision) as total_comisiones
-          FROM silver.transacciones_servicios
-          GROUP BY 1, 2;" > balance_servicios.txt
+               -c "SELECT 'CONEXIÓN EXITOSA' as estado, COUNT(*) as total FROM silver.transacciones_servicios;" > balance_servicios.txt
 
       - name: Guardar Reporte
         uses: actions/upload-artifact@v4
