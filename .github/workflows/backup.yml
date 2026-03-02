@@ -1,9 +1,9 @@
 name: supabase-backup-gold
 
 on:
-  workflow_dispatch: # Esto activa el botón manual
+  workflow_dispatch: # Esto activa el botón manual que buscabas
   schedule:
-    - cron: "0 5 * * *" # 12:00 AM Perú
+    - cron: "0 5 * * *" # 12:00 AM Perú (5:00 UTC)
 
 jobs:
   backup:
